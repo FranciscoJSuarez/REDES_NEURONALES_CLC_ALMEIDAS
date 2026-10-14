@@ -1,0 +1,252 @@
+AMBIENTES_ANACONDA
+Configuración general de ambientes independientes para U-Net, DenseNet-121 y ResNet-50
+Windows + Anaconda Prompt + GPU AMD mediante ROCm 7.2.1
+
+REQUISITOS
+- Windows 11 de 64 bits.
+- Anaconda o Miniconda instalado.
+- Python 3.12 en los ambientes.
+- Controlador AMD compatible con ROCm 7.2.1.
+- Ejecutar los comandos por bloques desde Anaconda Prompt.
+- Ruta utilizada para los ambientes: C:\CondaEnvs
+
+======================================================================
+1. LIMPIEZA OPCIONAL
+======================================================================
+
+Ejecutar únicamente cuando se necesite eliminar y reconstruir los ambientes existentes.
+
+REM conda deactivate
+REM conda env remove --prefix "C:\CondaEnvs\BASE_REDES_NEURONALES_AMD" -y
+REM conda env remove --prefix "C:\CondaEnvs\UNET_AMD" -y
+REM conda env remove --prefix "C:\CondaEnvs\DENSENET_AMD" -y
+REM conda env remove --prefix "C:\CondaEnvs\RESNET50_AMD" -y
+
+
+======================================================================
+2. CREAR EL AMBIENTE BASE
+======================================================================
+
+conda create --prefix "C:\CondaEnvs\BASE_REDES_NEURONALES_AMD" python=3.12 pip -y
+
+conda activate "C:\CondaEnvs\BASE_REDES_NEURONALES_AMD"
+
+python -m pip install --upgrade pip setuptools wheel
+
+
+======================================================================
+3. INSTALAR ROCm 7.2.1 PARA WINDOWS
+======================================================================
+
+python -m pip install --no-cache-dir ^
+"https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/rocm_sdk_core-7.2.1-py3-none-win_amd64.whl" ^
+"https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/rocm_sdk_devel-7.2.1-py3-none-win_amd64.whl" ^
+"https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/rocm_sdk_libraries_custom-7.2.1-py3-none-win_amd64.whl" ^
+"https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/rocm-7.2.1.tar.gz"
+
+python -m pip install --no-cache-dir ^
+"https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/torch-2.9.1%2Brocm7.2.1-cp312-cp312-win_amd64.whl" ^
+"https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/torchvision-0.24.1%2Brocm7.2.1-cp312-cp312-win_amd64.whl" ^
+"https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/torchaudio-2.9.1%2Brocm7.2.1-cp312-cp312-win_amd64.whl"
+
+
+======================================================================
+4. INSTALAR LIBRERÍAS GENERALES DEL PROYECTO
+======================================================================
+
+python -m pip install --no-cache-dir ^
+"numpy<2.3" ^
+pandas ^
+rasterio ^
+matplotlib ^
+openpyxl ^
+tqdm ^
+psutil ^
+scikit-learn ^
+scipy ^
+pillow ^
+ipykernel ^
+jupyterlab ^
+notebook
+
+python -m pip check
+
+
+======================================================================
+5. CONFIGURAR VARIABLES DEL AMBIENTE BASE
+======================================================================
+
+conda env config vars set ^
+OMP_NUM_THREADS=4 ^
+MKL_NUM_THREADS=4 ^
+OPENBLAS_NUM_THREADS=1 ^
+NUMEXPR_NUM_THREADS=4 ^
+GDAL_NUM_THREADS=2 ^
+GDAL_CACHEMAX=1024 ^
+PYTHONFAULTHANDLER=1
+
+conda deactivate
+
+
+======================================================================
+6. CREAR LOS TRES AMBIENTES INDEPENDIENTES
+======================================================================
+
+conda create --prefix "C:\CondaEnvs\UNET_AMD" --clone "C:\CondaEnvs\BASE_REDES_NEURONALES_AMD" -y
+
+conda create --prefix "C:\CondaEnvs\DENSENET_AMD" --clone "C:\CondaEnvs\BASE_REDES_NEURONALES_AMD" -y
+
+conda create --prefix "C:\CondaEnvs\RESNET50_AMD" --clone "C:\CondaEnvs\BASE_REDES_NEURONALES_AMD" -y
+
+
+======================================================================
+7. REGISTRAR EL KERNEL DE U-NET
+======================================================================
+
+conda activate "C:\CondaEnvs\UNET_AMD"
+
+python -m ipykernel install --user ^
+--name UNET_AMD ^
+--display-name "Python (U-Net AMD ROCm)"
+
+python -m pip check
+
+conda deactivate
+
+
+======================================================================
+8. REGISTRAR EL KERNEL DE DENSENET-121
+======================================================================
+
+conda activate "C:\CondaEnvs\DENSENET_AMD"
+
+python -m ipykernel install --user ^
+--name DENSENET_AMD ^
+--display-name "Python (DenseNet-121 AMD ROCm)"
+
+python -m pip check
+
+conda deactivate
+
+
+======================================================================
+9. REGISTRAR EL KERNEL DE RESNET-50
+======================================================================
+
+conda activate "C:\CondaEnvs\RESNET50_AMD"
+
+python -m ipykernel install --user ^
+--name RESNET50_AMD ^
+--display-name "Python (ResNet-50 AMD ROCm)"
+
+python -m pip check
+
+conda deactivate
+
+
+======================================================================
+10. VALIDAR CADA AMBIENTE
+======================================================================
+
+Validación de U-Net:
+
+conda activate "C:\CondaEnvs\UNET_AMD"
+
+python -u -c "import sys,torch,numpy,pandas,rasterio,sklearn; print('Python:',sys.version); print('Torch:',torch.__version__); print('HIP:',torch.version.hip); print('GPU disponible:',torch.cuda.is_available()); print('GPU:',torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NO DETECTADA'); print('NumPy:',numpy.__version__); print('Pandas:',pandas.__version__); print('Rasterio:',rasterio.__version__); print('Scikit-learn:',sklearn.__version__)"
+
+python -X faulthandler -u -c "import os,torch; import torch.nn.functional as F; assert torch.cuda.is_available(),'ROCm no detectó la GPU'; x=torch.ones((1,1,32,32),device='cuda'); k=torch.ones((1,1,3,3),device='cuda'); y=F.conv2d(x,k,padding=1); torch.cuda.synchronize(); print('Prueba GPU:',float(y[0,0,0,0].cpu())); print('VALIDACION_ROCM_OK'); os._exit(0)"
+
+conda deactivate
+
+
+Validación de DenseNet-121:
+
+conda activate "C:\CondaEnvs\DENSENET_AMD"
+
+python -u -c "import sys,torch,torchvision,numpy,pandas,rasterio,sklearn; print('Python:',sys.version); print('Torch:',torch.__version__); print('Torchvision:',torchvision.__version__); print('HIP:',torch.version.hip); print('GPU disponible:',torch.cuda.is_available()); print('GPU:',torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NO DETECTADA')"
+
+python -X faulthandler -u -c "import os,torch; from torchvision import models; assert torch.cuda.is_available(),'ROCm no detectó la GPU'; modelo=models.densenet121(weights=None).to('cuda'); x=torch.randn(1,3,224,224,device='cuda'); modelo.eval(); y=modelo(x); torch.cuda.synchronize(); print('Salida DenseNet-121:',tuple(y.shape)); print('VALIDACION_DENSENET_OK'); del modelo,x,y; torch.cuda.empty_cache(); os._exit(0)"
+
+conda deactivate
+
+
+Validación de ResNet-50:
+
+conda activate "C:\CondaEnvs\RESNET50_AMD"
+
+python -u -c "import sys,torch,torchvision,numpy,pandas,rasterio,sklearn; print('Python:',sys.version); print('Torch:',torch.__version__); print('Torchvision:',torchvision.__version__); print('HIP:',torch.version.hip); print('GPU disponible:',torch.cuda.is_available()); print('GPU:',torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NO DETECTADA')"
+
+python -X faulthandler -u -c "import os,torch; from torchvision import models; assert torch.cuda.is_available(),'ROCm no detectó la GPU'; modelo=models.resnet50(weights=None).to('cuda'); x=torch.randn(1,3,224,224,device='cuda'); modelo.eval(); y=modelo(x); torch.cuda.synchronize(); print('Salida ResNet-50:',tuple(y.shape)); print('VALIDACION_RESNET50_OK'); del modelo,x,y; torch.cuda.empty_cache(); os._exit(0)"
+
+conda deactivate
+
+
+======================================================================
+11. VERIFICAR LOS KERNELS REGISTRADOS
+======================================================================
+
+jupyter kernelspec list
+
+
+======================================================================
+12. ABRIR LOS CUADERNOS
+======================================================================
+
+Para U-Net:
+
+conda activate "C:\CondaEnvs\UNET_AMD"
+jupyter notebook --ServerApp.use_redirect_file=False
+
+
+Para DenseNet-121:
+
+conda activate "C:\CondaEnvs\DENSENET_AMD"
+jupyter notebook --ServerApp.use_redirect_file=False
+
+
+Para ResNet-50:
+
+conda activate "C:\CondaEnvs\RESNET50_AMD"
+jupyter notebook --ServerApp.use_redirect_file=False
+
+
+======================================================================
+13. KERNEL QUE DEBE SELECCIONARSE EN CADA CUADERNO
+======================================================================
+
+ENTRENAMIENTO_UNET.ipynb
+Kernel: Python (U-Net AMD ROCm)
+
+ENTRENAMIENTO_DENSENET.ipynb
+Kernel: Python (DenseNet-121 AMD ROCm)
+
+ENTRENAMIENTO_RESNET50.ipynb
+Kernel: Python (ResNet-50 AMD ROCm)
+
+
+======================================================================
+14. ACTUALIZAR LIBRERÍAS SIN RECREAR LOS AMBIENTES
+======================================================================
+
+U-Net:
+
+conda activate "C:\CondaEnvs\UNET_AMD"
+python -m pip install --upgrade pandas rasterio matplotlib openpyxl tqdm psutil scikit-learn scipy pillow ipykernel
+python -m pip check
+conda deactivate
+
+
+DenseNet-121:
+
+conda activate "C:\CondaEnvs\DENSENET_AMD"
+python -m pip install --upgrade pandas rasterio matplotlib openpyxl tqdm psutil scikit-learn scipy pillow ipykernel
+python -m pip check
+conda deactivate
+
+
+ResNet-50:
+
+conda activate "C:\CondaEnvs\RESNET50_AMD"
+python -m pip install --upgrade pandas rasterio matplotlib openpyxl tqdm psutil scikit-learn scipy pillow ipykernel
+python -m pip check
+conda deactivate
